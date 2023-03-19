@@ -1,0 +1,287 @@
+/**
+ * @NApiVersion 2.x
+ * @NScriptType MapReduceScript
+ * @NModuleScope SameAccount
+ */
+define(['N/file', 'N/record', 'N/runtime', 'N/search'],
+/**
+ * @param {file} file
+ * @param {record} record
+ * @param {runtime} runtime
+ * @param {search} search
+ */
+function(file, record, runtime, search) {
+   
+    /**
+     * Marks the beginning of the Map/Reduce process and generates input data.
+     *
+     * @typedef {Object} ObjectRef
+     * @property {number} id - Internal ID of the record instance
+     * @property {string} type - Record type id
+     *
+     * @return {Array|Object|Search|RecordRef} inputSummary
+     * @since 2015.1
+     */
+    function getInputData() {
+    	try{
+    		log.debug('In getInputData','In getInputData');
+    		var folderSearchObj = search.create({
+    			   type: "folder",
+    			   filters:
+    			   [
+    			      ["internalid","anyof","13688"]
+    			   ],
+    			   columns:
+    			   [
+    			      search.createColumn({
+    			         name: "internalid",
+    			         join: "file",
+    			         label: "File id"
+    			      })
+    			   ]
+    			});
+
+     		var pageCount = folderSearchObj.runPaged().count;
+     		log.debug("folderSearchObj result count",pageCount);
+     		
+     		var fileId;
+     		folderSearchObj.run().each(function(result){
+     		   fileId = result.getValue({name: "internalid",join: "file", label: "File id"});
+     		   log.debug('fileId', fileId);
+     		   return true;
+     		});
+
+     		var file_ID = {'fileId' : fileId};
+     		log.debug('End of getInputData Stage');
+     		return file_ID;
+
+    }
+   
+    catch(e){
+    	log.error("Error in getInputData");
+    }
+    }
+    /**
+     * Executes when the map entry point is triggered and applies to each key/value pair.
+     *
+     * @param {MapSummary} context - Data collection containing the key/value pairs to process through the map stage
+     * @since 2015.1
+     */
+    function map(context) {
+    	  try{
+    		  
+    		log.debug('In Map Stage...')
+    		var m_fileId = JSON.parse(context.value);'//here we have only single value is there so we get the value direct in obj'
+      		log.debug('m_fileId', m_fileId);
+      		
+
+      		var fileObj = file.load({
+      			id : m_fileId
+      		});
+      		var fileContent;
+      		if(fileObj.size < 10485760){
+      			fileContent = fileObj.getContents();
+      		}
+      		log.debug('fileContent', fileContent);
+      		
+      		log.debug('Value_length',context.value.length);
+	  		 var csvData = fileContent.split(/\r?\n/).map(function (line) {
+	  		      return line.split(',');
+	  		    });
+      		log.debug('csvData',csvData);
+      		 var rows = csvData.slice(1); 
+ 	  	    for (var i = 0; i < rows.length-1; i++) {
+ 	  	      var m_externalId = rows[i][0];
+ 	  	      log.debug('m_externalId',m_externalId);
+ 	  	      var m_customer = rows[i][1];
+ 	  	      log.debug('m_customer',m_customer);
+ 	  	      var m_item = rows[i][2];
+ 	  	      log.debug('m_item',m_item);
+ 	  	      var m_taxCode = rows[i][3];
+ 	  	      log.debug('m_taxCode',m_taxCode);
+ 	  	      var m_quantity = rows[i][4];
+ 	  	      log.debug('m_quantity',m_quantity);
+ 	  	      var m_rate = rows[i][5];
+ 	  	      log.debug('m_rate',m_rate);
+ 	  	      var m_amount = rows[i][6];
+ 	  	      log.debug('m_amount',m_amount);
+ 	  	      var m_location = rows[i][7];
+ 	  	      log.debug('m_location',m_location);
+ 	  	  context.write({
+	  			key :m_fileId,
+	  			value :{
+	  				'm_fileId':m_fileId,
+	  				'm_customer':m_customer,
+	  				'm_externalId':m_externalId,
+	  				'm_item':m_item,
+	  				'm_quantity':m_quantity,
+	  				'm_rate':m_rate,
+	  				'm_amount':m_amount,
+	  				'm_location':m_location,
+	  				'm_taxCode':m_taxCode
+	  			     }
+ 	  	         });
+ 	  	    }
+
+	  	}catch(e){
+	  		log.error('Error in map',e);
+	  	}
+    }
+
+    /**
+     * Executes when the reduce entry point is triggered and applies to each group.
+     *
+     * @param {ReduceSummary} context - Data collection containing the groups to process through the reduce stage
+     * @since 2015.1
+     */
+    function reduce(context) {
+    	try{
+   		log.debug('In Reduce Stage', 'In Reduce Stage');
+    		var value = context.values;
+    		var value_Length=context.values.length;
+    		log.debug("In reduce Stage");
+    		log.debug('In Reduce Stage');
+    		log.debug('Key:',context.key);
+    		log.debug('value:',context.values);
+    		log.debug('value Length:',context.values.length);
+    		
+    		var r_fileId;
+    		var r_customer;
+    		var r_externalId;
+    		var r_item;
+    		var r_quantity;
+    		var r_rate;
+    		var r_amount;
+    		var r_location;
+    		var r_taxCode;
+    		
+    		
+    		
+    		
+    		
+    		
+    		for(j = 0; j< value_Length; j++){
+
+    			var invResults = JSON.parse(value[j]);
+    			log.debug('invResults cA:',invResults);
+
+    			r_fileId = invResults.m_fileId;
+    			log.debug("r_fileId", r_fileId);
+    			
+    			r_customer = invResults.m_customer;
+    			log.debug("r_customer", r_customer);
+    			
+    			r_externalId = invResults.m_externalId;
+    			log.debug("r_externalId", r_externalId);
+    			
+    			r_item = invResults.m_item;
+    			log.debug("r_item", r_item);
+    			
+    			r_quantity = invResults.m_quantity;
+    			log.debug("r_quantity", r_quantity);
+    			
+    			r_rate = invResults.m_rate;
+    			log.debug("r_rate", r_rate);
+    			
+    			r_amount = invResults.m_amount;
+    			log.debug("r_amount", r_amount);
+    			
+    			r_location = invResults.m_location;
+    			log.debug("r_location", r_location);
+    			
+    			r_taxCode = invResults.m_taxCode;
+    			log.debug("r_taxCode", r_taxCode);
+    			
+          // Create Invoice And Set Value
+    			var invRecord = record.create({
+    				type : record.Type.INVOICE
+    			});
+    			
+    			invRecord.setValue({
+    				fieldId : 'entity',
+    				value : r_customer
+    			});
+    			log.debug('Customer entered successfully');
+    			
+    			invRecord.setSublistValue({
+    			    sublistId: 'item',
+    			    fieldId: 'item',
+    			    line: j,
+    			    value: r_item,
+    			});
+    			log.debug('Item entered successfully');
+    			
+    			invRecord.setSublistValue({
+    			    sublistId: 'item',
+    			    fieldId: 'quantity',
+    			    line: j,
+    			    value:r_quantity
+    			});
+    			log.debug('Quantity entered successfully');
+    			
+    			invRecord.setSublistValue({
+    			    sublistId: 'item',
+    			    fieldId: 'rate',
+    			    line: j,
+    			    value:r_rate
+    			});
+    			log.debug('Rate entered successfully');
+    			
+    			invRecord.setSublistValue({
+    			    sublistId: 'item',
+    			    fieldId: 'amount',
+    			    line: j,
+    			    value: r_amount
+    			});
+    			log.debug('Amount entered successfully');
+    			
+    			invRecord.setSublistValue({
+    			    sublistId: 'item',
+    			    fieldId: 'location',
+    			    line: j,
+    			    value: r_location
+    			});
+    			log.debug('Location entered successfully');
+    			
+    			invRecord.setSublistValue({
+    			    sublistId: 'item',
+    			    fieldId: 'taxcode',
+    			    line: j,
+    			    value: invResults['m_taxCode']
+    			});
+    			log.debug('Tax code entered successfully');
+    			
+    			
+    			
+    			var invoiceId = invRecord.save();
+    			log.debug('Invoice are created and Id is', invoiceId);
+    		
+    		}
+    			}
+
+    	
+    	catch(e){
+    		log.error("Error In Reduce Stage",e)
+    	}
+
+    }
+
+
+    /**
+     * Executes when the summarize entry point is triggered and applies to the result set.
+     *
+     * @param {Summary} summary - Holds statistics regarding the execution of a map/reduce script
+     * @since 2015.1
+     */
+    function summarize(summary) {
+
+    }
+
+    return {
+        getInputData: getInputData,
+        map: map,
+        reduce: reduce,
+        summarize: summarize
+    };
+    
+});

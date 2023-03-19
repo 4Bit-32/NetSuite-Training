@@ -1,0 +1,198 @@
+/**
+ * @NApiVersion 2.x
+ * @NScriptType MapReduceScript
+ * @NModuleScope SameAccount
+ */
+define(['N/record', 'N/runtime', 'N/search','N/file'],
+/**
+ * @param {record} record
+ * @param {runtime} runtime
+ * @param {search} search
+ */
+function(record, runtime, search,file) {
+   
+    /**
+     * Marks the beginning of the Map/Reduce process and generates input data.
+     *
+     * @typedef {Object} ObjectRef
+     * @property {number} id - Internal ID of the record instance
+     * @property {string} type - Record type id
+     *
+     * @return {Array|Object|Search|RecordRef} inputSummary
+     * @since 2015.1
+     */
+    function getInputData() {
+    	try{
+    	var invDetails= [];
+    	var invoiceSearchObj = search.create({
+    		   type: "invoice",
+    		   filters:
+    		   [
+    		      ["type","anyof","CustInvc"], 
+    		      "AND", 
+    		      ["status","anyof","CustInvc:D"], 
+    		      "AND", 
+    		      ["name","anyof","25808"], 
+    		      "AND", 
+    		      ["mainline","is","T"]
+    		   ],
+    		   columns:
+    		   [
+    		      search.createColumn({name: "entity", label: "Name"}),
+    		      search.createColumn({name: "amountremaining", label: "Amount Remaining"}),
+    		      search.createColumn({name: "email", label: "Email"}),
+    		      search.createColumn({name: "statusref", label: "Status"}),
+    		      search.createColumn({name: "tranid", label: "Document Number"})
+    		   ]
+    		});
+    		var searchResultCount = invoiceSearchObj.runPaged().count;
+    		log.debug("invoiceSearchObj result count",searchResultCount);
+    		invoiceSearchObj.run().each(function(result){
+    			invCustName= result.getValue('entity');
+    			log.debug('invoiceCustName',invCustName);
+    			invRemainAmount= result.getValue('amountremaining');
+    			log.debug('invoiceCustName',invRemainAmount);
+    			invCustEmail=result.getValue('email');
+    			log.debug('invCustEmail',invCustEmail);
+    			invStatus=result.getValue('statusref');
+    			log.debug('invStatus',invStatus);
+    			invDocNumber=result.getValue('tranid');
+    			log.debug('invDocNumber',invDocNumber)
+    			
+    			
+    			invDetails.push({
+    			'invCustName':invCustName,
+    			'invRemainAmount':invRemainAmount,
+    			'invCustEmail':invCustEmail,
+    			'invStatus':invStatus,
+    			'invDocNumber':invDocNumber
+    		});
+    		   // .run().each has a limit of 4,000 results
+    		   return true;
+    		});
+    		log.debug('invDetails',invDetails);
+    		log.debug('End GetInputData');
+    		
+    		return invDetails;
+    		
+    	}catch(e){
+    		log.error('Error in GetInputData',e);
+    	}
+    		
+
+    		/*
+    		invoiceSearchObj.id="customsearch1678872404452";
+    		invoiceSearchObj.title="Invoice Search Record For  CSV JA (copy)";
+    		var newSearchId = invoiceSearchObj.save();
+    		*/
+
+    }
+
+    /**
+     * Executes when the map entry point is triggered and applies to each key/value pair.
+     *
+     * @param {MapSummary} context - Data collection containing the key/value pairs to process through the map stage
+     * @since 2015.1
+     */
+    function map(context) {
+    	try{
+         log.debug('In Map Stage');
+         invResult=JSON.parse(context.value);
+         log.debug('invResult',invResult);
+         
+         var m_invCustName = invResult.invCustName;
+         
+         var m_invRemainAmount = invResult.invRemainAmount;
+         var m_invCustEmail = invResult.invCustEmail;
+         var m_invStatus = invResult.invStatus;
+         var m_invDocNumber = invResult.invDocNumber;
+         
+         
+//         context.write({
+//        	 key: m_invDocNumber,
+//        	 value:{
+//        		'm_invCustName': m_invCustName,
+//        		'm_invRemainAmount':m_invRemainAmount,
+//        		'm_invCustEmail':m_invCustEmail,
+//        		'm_invStatus':m_invStatus,
+//        		'm_invDocNumber':m_invDocNumber
+//        	 }
+//         });
+         
+        	 for (var i=0;i<5;i++){
+       var   row[i] = m_invCustName+ ',' +m_invRemainAmount+ ',' + m_invCustEmail+ ',' + m_invStatus+ ',' +m_invDocNumber;
+         log.debug('m_invCustName',invResult.m_invCustName);
+	     var fileObj = file.create({
+			      name: 'invData.csv',
+			      fileType: file.Type.CSV,
+			      contents: 'Customer Name,Due Amount,Email Id,Status,Document number\n' + row + '\r\n'
+			    });
+			    fileObj.folder = 13688; // Replace with the ID of the folder where you want to save the file
+			    fileObj.save();
+			   
+         
+        	 }
+       
+    }
+	catch(e){
+		log.error('error in map function',e);
+	}
+         
+    }
+
+    /**
+     * Executes when the reduce entry point is triggered and applies to each group.
+     *
+     * @param {ReduceSummary} context - Data collection containing the groups to process through the reduce stage
+     * @since 2015.1
+     */
+    function reduce(context) {
+    	try{
+//    	log.debug('In Reduce Stage');
+//        
+//    	invResult=JSON.parse(context.value);
+//        log.debug('invResult',value);
+//        var r_invCustName = invResult.m_invCustName;
+//        log.debug('r_invCustName',r_invCustName);
+//        var r_invRemainAmount = invResult.m_invRemainAmount;
+//        log.debug('r_invRemainAmount',r_invRemainAmount);
+//        var r_invCustEmail = invResult.m_invCustEmail;
+//        log.debug('r_invCustEmail',r_invCustEmail);
+//        var r_invStatus = invResult.m_invStatus;
+//        log.debug('r_invStatus',r_invStatus);
+//        var r_invDocNumber = invResult.m_invDocNumber;
+//        log.debug('r_invDocNumber',r_invDocNumber);
+//         for(i=0;i<context.lenght;i++){
+//	        var row = r_custName[i] + ',' + r_custTranid[i] + ',' + r_invAmount[i] + ',' + r_amountPaid[i]+ ',' +r_custEmail[i];
+//	        var fileObj = file.create({
+//			      name: 'transactions.csv',
+//			      fileType: file.Type.CSV,
+//			      contents: 'Customer Name,Due Amount,Email Id,Status,Document number\n' + row + '\n'
+//			    });
+//			    fileObj.folder = 13688; // Replace with the ID of the folder where you want to save the file
+//			    fileObj.save();
+//          }
+      }
+    catch(e){
+    	log.debug('error in reduce',e);
+    }
+   }
+
+    /**
+     * Executes when the summarize entry point is triggered and applies to the result set.
+     *
+     * @param {Summary} summary - Holds statistics regarding the execution of a map/reduce script
+     * @since 2015.1
+     */
+    function summarize(summary) {
+
+    }
+
+    return {
+        getInputData: getInputData,
+        map: map,
+        reduce: reduce,
+        summarize: summarize
+    };
+    
+});

@@ -1,0 +1,267 @@
+/**
+ * @NApiVersion 2.x
+ * @NScriptType MapReduceScript
+ * @NModuleScope SameAccount
+ */
+define(['N/currentRecord', 'N/email', 'N/record', 'N/runtime', 'N/search'],
+/**
+ * @param {currentRecord} currentRecord
+ * @param {email} email
+ * @param {file} file
+ * @param {record} record
+ * @param {runtime} runtime
+ * @param {search} search
+ */
+function(currentRecord,email, record, runtime, search) {
+   
+    /**
+     * Marks the beginning of the Map/Reduce process and generates input data.
+     *
+     * @typedef {Object} ObjectRef
+     * @property {number} id - Internal ID of the record instance
+     * @property {string} type - Record type id
+     *
+     * @return {Array|Object|Search|RecordRef} inputSummary
+     * @since 2015.1
+     */
+    function getInputData() {
+    	
+    	try{
+    		log.debug('In getInputData');
+    		var invoiceSearchObj = search.create({
+    			   type: "invoice",
+    			   filters:
+    			   [
+    			      ["type","anyof","CustInvc"], 
+    			      "AND", 
+    			      ["mainline","is","T"], 
+    			      "AND", 
+    			      ["trandate","within","3/12/2023","3/15/2023"], 
+    			      "AND", 
+    			      ["status","anyof","CustInvc:A","CustInvc:B"],
+    			      "AND", 
+    			      ["name","anyof","25808"]
+    			   ],
+    			   columns:
+    			   [
+    			      search.createColumn({name: "tranid", label: "Document Number"}),
+    			      search.createColumn({name: "statusref", label: "Status"}),
+    			      search.createColumn({name: "amount", label: "Amount"}),
+    			      search.createColumn({name: "email",join: "customerMain",label: "Email"}),
+    			      search.createColumn({name: "amountpaid", label: "Amount Paid"}),
+    			      search.createColumn({name: "amountremaining", label: "Amount Remaining"}),
+    			      search.createColumn({name: "entity", label: "Name"})
+    			   ]
+    			});
+    			var searchResultCount = invoiceSearchObj.runPaged().count; // here i m counting the invoiceSearchobj page is run How many times using runpaged()
+    			log.debug("invoiceSearchObj result count",searchResultCount);
+    			
+    			var invoiceList=[]; //here i m create array.
+    			
+    			var invDocNumber;
+    			var invStatus;
+    			var invAmount;
+    			var custEmail;
+    			var invPaidAmount;
+    			var invDueAmount;
+    			var invCustomerName;
+    			
+
+    			invoiceSearchObj.run().each(function(result){
+    			   // .run().each has a limit of 4,000 results
+    				
+    				
+    				invDocNumber=result.getValue('tranid');             // Here i m getting the Document Number
+    				log.debug('invDocNumber',invDocNumber);
+    				
+    				invStatus=result.getValue('statusref');             // here i m getting Status of Invoice
+    				log.debug('invStatus',invStatus);
+    				
+    				invAmount=result.getValue('amount');                // here i m getting invoice Total Amount
+    				log.debug('invAmount',invAmount);
+    				
+    				custEmail=result.getValue({name:'email',join:'customerMain'});                // here i m getting customer Email
+    				log.debug('custEmail',custEmail);
+    				
+    				invPaidAmount=result.getValue('amountpaid');      // here i m getting Paid Amount
+    				log.debug('invPaidAmount',invPaidAmount);
+    				
+    				invDueAmount=result.getValue('amountremaining'); //here i m getting Due Amount
+    				log.debug('invDueAmount',invDueAmount);
+    				
+    				invCustomerName=result.getValue('entity');       // here i m getting invoice Customer Name
+    				log.debug('invCustomerName',invCustomerName);
+    				
+    			  
+    				 invoiceList.push({                                // here i m pushing data into an  array 
+    	            	   'invDocNumber':invDocNumber,
+    	            	   'invStatus':invStatus,
+    	            	   'invAmount':invAmount,
+    	            	   'custEmail':custEmail,
+    	            	   'invPaidAmount':invPaidAmount,
+    	                   'invDueAmount':invDueAmount,
+    	                   'invCustomerName':invCustomerName });
+
+    			     return true;
+               });
+    			
+    			 log.debug('invoiceList',invoiceList); 
+				 log.debug('End getInputData');
+    		     return invoiceList;   // here return is used to pass the data in  the map function 
+    	}
+    	catch(e){
+    		log.error('Error in getInputData',e);
+    		
+    	}
+    	
+    }
+
+    /**
+     * Executes when the map entry point is triggered and applies to each key/value pair.
+     *
+     * @param {MapSummary} context - Data collection containing the key/value pairs to process through the map stage
+     * @since 2015.1
+     */
+    function map(context) {
+    	try{
+    		log.debug('In MAp function');
+    		
+    		var invResult=JSON.parse(context.value); //here i am getting the data from the getInputData Function.
+    		log.debug('invResult',invResult);
+    		
+    		// Here I m assign the value from get variable to map variable
+    		
+    		var m_invDocNumber = invResult.invDocNumber;
+			var m_invStatus = invResult.invStatus;
+			var m_invAmount = invResult.invAmount;
+			var m_custEmail = invResult.custEmail;
+			var m_invPaidAmount = invResult.invPaidAmount;
+			var m_invDueAmount = invResult.invDueAmount;
+			var m_invCustomerName = invResult.invCustomerName;
+			 
+			
+			log.debug('m_invDocNumber',m_invDocNumber);
+			log.debug('m_invStatus',m_invStatus);
+			log.debug('m_invAmount',m_invAmount);
+			log.debug('m_invDueDate',m_custEmail);
+			log.debug('m_invPaidAmount',m_invPaidAmount);
+			log.debug('m_invDueAmount',m_invDueAmount);
+			log.debug('m_invCustomerName',m_invCustomerName);
+			
+			context.write({                               // here context.write() is used to  pass the data in reduce function
+				key : m_invDocNumber,
+				value:{
+					'm_invDocNumber':m_invDocNumber,
+					'm_invStatus':m_invStatus,
+					'm_invAmount':m_invAmount,
+					'm_custEmail':m_custEmail,
+					'm_invPaidAmount':m_invPaidAmount,
+					'm_invDueAmount':m_invDueAmount,
+					'm_invCustomerName':m_invCustomerName
+				     }
+			 });
+
+			
+    	}catch(e)
+    	{
+    		log.error('Error in Map function');
+    	}
+
+    }
+
+    /**
+     * Executes when the reduce entry point is triggered and applies to each group.
+     *
+     * @param {ReduceSummary} context - Data collection containing the groups to process through the reduce stage
+     * @since 2015.1
+     */
+    function reduce(context) {
+    	try{
+    		log.debug('In Reduce ');
+    		
+            log.debug('key',context.key);
+            var value = context.values;
+    		log.debug('values',context.values);
+    		
+    		var valueLength = context.values.length; 
+    		log.debug('value Length',context.values.length);
+    		var r_invDocNumber;
+    		var r_invStatus;
+    		var r_invAmount;
+    		var r_custEmail ;
+    		var r_invPaidAmount;
+    		var r_invDueAmount;
+    		var r_invCustomerName;
+
+    		// Here I m assign the value from map variable to  Reduce variable.
+    		
+			var currentUser=25660;
+			log.debug('currentuser:',currentUser);
+			var emailSubject='Pay Due Amount';
+			log.debug('emailSubject',emailSubject);
+			
+			
+			
+ 			
+ 			for(var i=0; i< valueLength;i++){
+ 				var invoiceResult = JSON.parse(value[i]);
+				log.debug('invoiceValue', invoiceResult);
+ 			
+				var r_invDocNumber = invoiceResult.m_invDocNumber;
+	    		log.debug('r_invDocNumber',r_invDocNumber);
+				var r_invStatus = invoiceResult.m_invStatus;
+				log.debug('r_invStatus',r_invStatus);
+				var r_invAmount = invoiceResult.m_invAmount;
+				log.debug('r_invAmount',r_invAmount);
+				var r_custEmail = invoiceResult.m_custEmail;
+				log.debug('r_custEmail',r_custEmail);
+				var r_invPaidAmount = invoiceResult.m_invPaidAmount;
+				log.debug('r_invPaidAmount',r_invPaidAmount);
+				var r_invDueAmount = invoiceResult.m_invDueAmount;
+				log.debug('r_invDueAmount',r_invDueAmount);
+				var r_invCustomerName = invoiceResult.m_invCustomerName;
+				log.debug('r_invCustomerName',r_invCustomerName);
+				var emailBody = 'Hi Customer,' + '\r\n'
+				+ 'Your Remaning amount to pay '+r_custAmount+' please create a full payment of Your Invoice Payment'+'\r\n' + 'Thanks,Admin';
+				if(r_invStatus=='A')
+	 		    email.send({
+					author : currentUser,
+					recipients : r_custEmail,   //Recipient Email ID
+					subject : emailSubject,   //Email subject
+					body : emailBody            // Email Body From Upper emailBody Var....
+			   });
+				else{
+					
+					log.debug('This Customer Paid Full Amount');
+					
+				}
+	 		   
+			     log.debug('Email is sent',emailBody);
+    	    };
+
+    	}catch(e){
+    		
+    		log.error('Error in Reduce',e);
+    	}
+
+    }
+
+
+    /**
+     * Executes when the summarize entry point is triggered and applies to the result set.
+     *
+     * @param {Summary} summary - Holds statistics regarding the execution of a map/reduce script
+     * @since 2015.1
+     */
+    function summarize(summary) {
+
+    }
+
+    return {
+        getInputData: getInputData,
+        map: map,
+        reduce: reduce,
+        summarize: summarize
+    };
+    
+});
